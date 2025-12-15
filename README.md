@@ -1,34 +1,91 @@
 # context-core
 
-Semantic breakdown and information extraction from raw text.
+Semantic breakdown and structured information extraction from raw text.
 
-`context-core` is a minimal library that takes an unstructured string and returns a structured JSON representation by semantically analyzing the text and extracting relevant information.
+`context-core` is a minimal, black-box library that takes an unstructured string and returns a **normalized, typed JSON representation** describing what the user said: events, tools, goals, identity, skills, and other semantic signals.
+
+Input in. Structure out. Nothing else.
+
+---
 
 ## What it does
 
-- Performs semantic breakdown of input text
-- Extracts meaningful information (facts, attributes, relations)
-- Outputs normalized, structured JSON
+- Performs semantic analysis of raw text
+- Extracts **explicitly stated information** into well-defined buckets
+- Outputs a deterministic, machine-usable JSON structure
 
-Pure input → output. No state, no side effects.
+The library is **pure**:
 
-## What it does not do
+- no state
+- no memory
+- no persistence
+- no side effects
 
-- No data storage or memory
+---
+
+## What it extracts
+
+Depending on the input, `context-core` may extract:
+
+- **Identity** – self-declared roles or labels
+- **Goals** – desired future states expressed by the user
+- **Events** – things happening, happened, or planned
+- **Tools** – hardware, software, or services in use
+- **Skills** – user capabilities
+- **Jobs** – long-running work, projects, or commitments
+- **Preferences** – likes, dislikes, defaults
+- **Experiences** – past events with lasting relevance
+- **Facts** – asserted truths (with confidence)
+- **Results** – outcomes produced by events
+- **Intents** – what the user is trying to do
+- **Constraints** – temporary limitations or blockers
+- **Warnings** – risk signals (e.g. data loss, security)
+
+Each item is returned with **confidence** and, where applicable, **temporal decay**.
+
+---
+
+## What it does NOT do
+
+- No data storage or long-term memory
 - No embeddings or vector search
-- No agents, workflows, or orchestration
-- No UI or product-level logic
+- No agents, planners, or workflows
+- No UI or product logic
+- No hallucinated or inferred identity
 
-This is a single-purpose extraction layer.
+This is a **semantic compiler**, not an assistant.
 
-## Intended use
+---
 
-Designed to sit at the boundary between language and systems:
+## Output format (v0.1)
 
-- Preprocessing for AI and ML pipelines
-- Context extraction for SaaS backends
-- Structured input generation for RAG systems
-- Any system that needs predictable data from text
+`context-core` always returns the same top-level structure:
+
+```json
+{
+  "identity": [],
+  "goals": [],
+  "events": [],
+  "tools": [],
+  "skills": [],
+  "jobs": [],
+  "preferences": [],
+  "experiences": [],
+  "facts": [],
+  "results": [],
+  "intents": [],
+  "constraints": [],
+  "warnings": [],
+  "meta": {}
+}
+```
+
+- All fields are arrays (except `meta`)
+- Empty arrays mean "nothing extracted"
+- No bucket overlaps
+- No hidden state
+
+---
 
 ## Installation
 
@@ -36,40 +93,73 @@ Designed to sit at the boundary between language and systems:
 npm install context-core
 ```
 
+---
+
 ## Basic usage
 
 ```javascript
 const { extractContext } = require("context-core");
 
 const result = extractContext(
-  "I prefer dark mode and live in Bangalore."
+  "I want to reset my PC without losing my Chrome data."
 );
 
 console.log(result);
 ```
 
-**Output:**
+**Example output (simplified):**
 
 ```json
 {
-  "preferences": {
-    "ui_theme": "dark"
-  },
-  "location": {
-    "city": "Bangalore"
+  "goals": [
+    {
+      "description": "reset pc without losing chrome data",
+      "horizon": "short",
+      "status": "active",
+      "confidence": 0.85
+    }
+  ],
+  "tools": [
+    {
+      "type": "software",
+      "name": "google_chrome",
+      "confidence": 0.9
+    }
+  ],
+  "events": [],
+  "identity": [],
+  "meta": {
+    "source": "text"
   }
 }
 ```
 
-Output schema is intentionally minimal and may evolve during `0.1.x`.
+> Exact schemas may evolve during `0.1.x`, but bucket meanings are stable.
+
+---
+
+## Intended use
+
+`context-core` is designed to sit **between language and systems**, acting as a normalization layer for:
+
+- SaaS backends that need structured user context
+- AI / ML preprocessing pipelines
+- RAG systems that require explicit signals, not chat logs
+- Any product that needs **predictable structure from text**
+
+---
 
 ## Project status
 
-Early development.
+Early development (`0.1.x`).
 
-- API and schema may change
-- Feedback welcome
-- Stability will come after usage
+- APIs may change
+- Schemas may expand
+- Breaking changes possible
+
+Stability will come after real usage and feedback.
+
+---
 
 ## License
 
