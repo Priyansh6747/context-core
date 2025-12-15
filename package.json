@@ -1,0 +1,27 @@
+{
+  "name": "context-core",
+  "version": "0.1.0",
+  "description": "Core utilities for structuring and updating long-term context from text",
+  "keywords": [
+    "context",
+    "memory",
+    "nlp",
+    "ai",
+    "structured-data"
+  ],
+  "homepage": "https://github.com/Priyansh6747/context-core#readme",
+  "bugs": {
+    "url": "https://github.com/Priyansh6747/context-core/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Priyansh6747/context-core.git"
+  },
+  "license": "MIT",
+  "author": "Priyansh6747",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
