@@ -512,7 +512,6 @@ function extractIdentity(text) {
                 seen[key] = true;
                 unique.push({
                     value: item.value,
-                    raw: item.raw || '',
                     type: item.type,
                     subtype: item.subtype || null,
                     confidence: isValidNumber(item.confidence) ? item.confidence : 0.5
