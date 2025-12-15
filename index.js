@@ -1,7 +1,8 @@
 "use strict";
 const identity = require("./modules/identity");
-
-let test = identity.extractIdentity("Online I go by the alias sovereign but my real name is Priyansh.and i am 22 years");
+const goals = require("./modules/goals");
+const tools = require("./modules/tools");
+let test = tools.extractTools("This project depends on cloud storage and passkeys for secure authentication.")
 console.log(test)
 
 function example() {
