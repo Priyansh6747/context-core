@@ -2,24 +2,23 @@
 
 /**
  * context-core - Semantic Extraction Library
- * 
+ *
  * Extracts structured information from unstructured text.
  * Pure, stateless, deterministic semantic compiler.
  */
-
-// Import all extraction modules
-var identity = require("./modules/identity");
-var goals = require("./modules/goals");
-var tools = require("./modules/tools");
-var skills = require("./modules/skills");
-var jobs = require("./modules/jobs");
-var preferences = require("./modules/preferences");
-var experiences = require("./modules/experiences");
-var facts = require("./modules/facts");
-var results = require("./modules/results");
-var intents = require("./modules/intents");
-var constraints = require("./modules/constraints");
-var warnings = require("./modules/warnings");
+const identity = require("./modules/identity");
+const goals = require("./modules/goals");
+const events = require("./modules/events");
+const tools = require("./modules/tools");
+const skills = require("./modules/skills");
+const jobs = require("./modules/jobs");
+const preferences = require("./modules/preferences");
+const experiences = require("./modules/experiences");
+const facts = require("./modules/facts");
+const results = require("./modules/results");
+const intents = require("./modules/intents");
+const constraints = require("./modules/constraints");
+const warnings = require("./modules/warnings");
 
 // ==========================================
 // UTILITY FUNCTIONS
@@ -89,6 +88,7 @@ function extractContext(text, options) {
         // Extract from all modules
         var extractedIdentity = safeArray(identity.extractIdentity(text));
         var extractedGoals = safeArray(goals.extractGoals(text));
+        var extractedEvents = safeArray(events.extractEvents(text));
         var extractedTools = safeArray(tools.extractTools(text));
         var extractedSkills = safeArray(skills.extractSkills(text));
         var extractedJobs = safeArray(jobs.extractJobs(text));
@@ -103,7 +103,7 @@ function extractContext(text, options) {
         return {
             identity: extractedIdentity,
             goals: extractedGoals,
-            events: [], // Events module not yet implemented
+            events: extractedEvents,
             tools: extractedTools,
             skills: extractedSkills,
             jobs: extractedJobs,
@@ -148,6 +148,7 @@ module.exports = {
     // Individual extractors for targeted use
     extractIdentity: identity.extractIdentity,
     extractGoals: goals.extractGoals,
+    extractEvents: events.extractEvents,
     extractTools: tools.extractTools,
     extractSkills: skills.extractSkills,
     extractJobs: jobs.extractJobs,

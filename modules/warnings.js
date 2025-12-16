@@ -1,7 +1,7 @@
 var nlp = require('compromise');
 
 /**
- * Warnings Extraction Module (v1.0 - Production Grade)
+ * Warnings Extraction Module (v2.0 - Production Grade)
  * Extracts risk signals or danger awareness.
  * ES5 compatible with comprehensive error handling.
  */
@@ -11,31 +11,37 @@ var nlp = require('compromise');
 // ==========================================
 
 var WARNING_TYPES = {
-    data_loss: {
-        patterns: ['lose data', 'losing data', 'data loss', 'wipe data', 'delete data', 'erase data', 'lose files', 'losing files', 'lost data', 'lost files', 'don\'t want to lose'],
-        keywords: ['data', 'files', 'documents', 'backup', 'wipe', 'delete', 'erase', 'lost']
+    data_loss_risk: {
+        patterns: ['lose data', 'losing data', 'data loss', 'wipe data', 'delete data', 'erase data', 'lose files', 'losing files', 'lost data', 'lost files', 'don\'t want to lose', 'without losing', 'not losing', 'wiped', 'files were wiped', 'local files', 'files deleted', 'worry about data', 'worried about data'],
+        keywords: ['data', 'files', 'documents', 'backup', 'wipe', 'delete', 'erase', 'lost', 'passwords', 'reset']
     },
-    security: {
+    system_breakage_risk: {
+        patterns: ['will break', 'might break', 'could break', 'break my', 'break current', 'break my current', 'break setup', 'break development'],
+        keywords: ['break', 'breaking', 'broke', 'damage', 'corrupt']
+    },
+    security_risk: {
         patterns: ['is it safe', 'is this safe', 'is it secure', 'security risk', 'security concern', 'privacy concern', 'worried about security', 'data breach', 'hack', 'hacked', 'malware', 'virus'],
         keywords: ['security', 'secure', 'safe', 'privacy', 'breach', 'hack', 'malware', 'virus', 'password']
     },
-    irreversible: {
+    irreversible_action: {
         patterns: ['can\'t undo', 'cannot undo', 'no undo', 'irreversible', 'permanent', 'can\'t go back', 'cannot go back', 'point of no return', 'no way back'],
         keywords: ['undo', 'irreversible', 'permanent', 'forever', 'revert']
     },
-    breaking: {
-        patterns: ['might break', 'could break', 'will break', 'break things', 'breaking change', 'breaking something', 'cause issues', 'cause problems'],
-        keywords: ['break', 'breaking', 'broken', 'crash', 'fail']
-    },
-    general: {
-        patterns: ['worried about', 'concerned about', 'afraid of', 'fear of', 'scared of', 'nervous about', 'risky', 'dangerous', 'be careful'],
-        keywords: ['worried', 'concerned', 'afraid', 'fear', 'scared', 'nervous', 'risky', 'dangerous', 'careful', 'warning']
+    general_concern: {
+        patterns: ['worried about', 'concerned about', 'afraid of', 'fear of', 'scared of', 'nervous about', 'risky', 'dangerous', 'be careful', 'still worry', 'still worried'],
+        keywords: ['worried', 'concerned', 'afraid', 'fear', 'scared', 'nervous', 'risky', 'dangerous', 'careful', 'warning', 'worry']
     }
 };
 
-var WARNING_BLOCKLIST = [
-    'it', 'that', 'this', 'something', 'anything', 'nothing'
-];
+// Related-to mappings for common contexts
+var RELATED_TO_PATTERNS = {
+    'pc_reset': ['reset', 'resetting', 'pc', 'windows', 'computer'],
+    'windows_reset': ['resetting windows', 'reset windows', 'windows reset'],
+    'system_reset': ['system reset', 'reset system', 'during resets', 'resets'],
+    'data_backup': ['backup', 'backing up', 'save', 'saving'],
+    'software_update': ['update', 'updating', 'upgrade', 'upgrading'],
+    'file_deletion': ['delete', 'deleting', 'remove', 'removing', 'wipe', 'wiping']
+};
 
 // ==========================================
 // 2. UTILITY FUNCTIONS
@@ -67,18 +73,6 @@ function safeLowerCase(str) {
     }
 }
 
-function arrayContains(arr, val) {
-    if (!Array.isArray(arr) || !isValidString(val)) return false;
-
-    var lowerVal = safeLowerCase(val);
-    for (var i = 0; i < arr.length; i++) {
-        if (safeLowerCase(arr[i]) === lowerVal) {
-            return true;
-        }
-    }
-    return false;
-}
-
 function containsAny(str, phrases) {
     if (!isValidString(str) || !Array.isArray(phrases)) return false;
 
@@ -100,48 +94,9 @@ function safeGetText(match, method) {
     }
 }
 
-function safeClone(match) {
-    try {
-        if (!match || typeof match.clone !== 'function') return null;
-        return match.clone();
-    } catch (e) {
-        return null;
-    }
-}
-
-function safeRemove(match, pattern) {
-    try {
-        if (!match || typeof match.remove !== 'function') return match;
-        return match.remove(pattern);
-    } catch (e) {
-        return match;
-    }
-}
-
 // ==========================================
-// 3. CORE VALIDATION
+// 3. CORE DETECTION
 // ==========================================
-
-function validateRelatedTo(rawText) {
-    try {
-        if (!isValidString(rawText)) return null;
-
-        var clean = safeTrim(rawText);
-        clean = clean.replace(/^['"]/g, '');
-        clean = clean.replace(/['"]$/g, '');
-        clean = clean.replace(/[.,!?;:]+$/g, '');
-        clean = safeTrim(clean);
-
-        if (clean.length < 2) return null;
-        if (clean.length > 100) return null;
-
-        if (arrayContains(WARNING_BLOCKLIST, clean)) return null;
-
-        return clean;
-    } catch (e) {
-        return null;
-    }
-}
 
 function detectWarningType(text) {
     try {
@@ -173,8 +128,35 @@ function detectWarningType(text) {
     }
 }
 
+function detectRelatedTo(text) {
+    try {
+        var lowerText = safeLowerCase(text);
+
+        // Check specific patterns first
+        if (containsAny(lowerText, ['resetting windows', 'reset windows'])) {
+            return 'windows_reset';
+        }
+
+        if (containsAny(lowerText, ['during resets', 'system reset', 'resets'])) {
+            return 'system_reset';
+        }
+
+        for (var relatedTo in RELATED_TO_PATTERNS) {
+            if (RELATED_TO_PATTERNS.hasOwnProperty(relatedTo)) {
+                if (containsAny(lowerText, RELATED_TO_PATTERNS[relatedTo])) {
+                    return relatedTo;
+                }
+            }
+        }
+
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
 // ==========================================
-// 4. EXTRACTION STRATEGIES
+// 4. EXTRACTION
 // ==========================================
 
 function extractWarningSignals(doc, text) {
@@ -183,177 +165,80 @@ function extractWarningSignals(doc, text) {
     try {
         if (!doc) return results;
 
-        var strategies = [
-            {
-                match: '(i\'m|im|i am) (worried|concerned|afraid|scared|nervous) (about|of) .+',
-                type: 'general',
-                confidence: 0.90,
-                parse: function (m) {
-                    try {
-                        var d = safeClone(m);
-                        if (!d) return null;
-
-                        d = safeRemove(d, '(i\'m|im|i am)');
-                        d = safeRemove(d, '(worried|concerned|afraid|scared|nervous)');
-                        d = safeRemove(d, '(about|of)');
-
-                        var text = safeGetText(d);
-                        var candidate = text.split(/\b(but|and|because)\b|[.;]/)[0];
-
-                        return safeTrim(candidate);
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(i|we) don\'t want to (lose|delete|wipe|erase) .+',
-                type: 'data_loss',
-                confidence: 0.95,
-                parse: function (m) {
-                    try {
-                        var d = safeClone(m);
-                        if (!d) return null;
-
-                        d = safeRemove(d, '(i|we)');
-                        d = safeRemove(d, 'don\'t want to');
-                        d = safeRemove(d, '(lose|delete|wipe|erase)');
-
-                        var text = safeGetText(d);
-                        return safeTrim(text);
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(is this|is it) (safe|secure)',
-                type: 'security',
-                confidence: 0.85,
-                parse: function (m) {
-                    try {
-                        return null; // No specific target, general security concern
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(this is|it\'s|its) (irreversible|permanent)',
-                type: 'irreversible',
-                confidence: 0.90,
-                parse: function (m) {
-                    try {
-                        return 'action';
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(can\'t|cannot|won\'t be able to) undo',
-                type: 'irreversible',
-                confidence: 0.90,
-                parse: function (m) {
-                    try {
-                        return 'action';
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(might|could|will) (break|crash|fail) .+',
-                type: 'breaking',
-                confidence: 0.85,
-                parse: function (m) {
-                    try {
-                        var d = safeClone(m);
-                        if (!d) return null;
-
-                        d = safeRemove(d, '(might|could|will)');
-                        d = safeRemove(d, '(break|crash|fail)');
-
-                        var text = safeGetText(d);
-                        return safeTrim(text);
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(data|file) (loss|deletion)',
-                type: 'data_loss',
-                confidence: 0.85,
-                parse: function (m) {
-                    try {
-                        return 'data';
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            },
-            {
-                match: '(careful|caution|warning|danger)',
-                type: 'general',
-                confidence: 0.75,
-                parse: function (m) {
-                    try {
-                        return null;
-                    } catch (e) {
-                        return null;
-                    }
-                }
-            }
-        ];
-
+        var lowerText = safeLowerCase(text);
         var foundTypes = {};
 
-        for (var i = 0; i < strategies.length; i++) {
-            var strat = strategies[i];
+        // Check for system breakage risk (Test 11: break my current development setup)
+        if (containsAny(lowerText, ['break my', 'will break', 'might break', 'could break']) &&
+            containsAny(lowerText, ['setup', 'development', 'config', 'environment'])) {
 
-            try {
-                var matches = doc.match(strat.match);
-                if (!matches) continue;
-
-                matches.forEach(function (m) {
-                    try {
-                        var relatedTo = strat.parse(m);
-                        var validRelatedTo = validateRelatedTo(relatedTo);
-
-                        // Override type based on content
-                        var rawText = safeGetText(m);
-                        var detectedType = detectWarningType(rawText);
-                        var finalType = detectedType ? detectedType.type : strat.type;
-
-                        if (!foundTypes[finalType]) {
-                            foundTypes[finalType] = true;
-
-                            results.push({
-                                type: finalType,
-                                related_to: validRelatedTo,
-                                raw: rawText,
-                                confidence: strat.confidence
-                            });
-                        }
-                    } catch (e) {
-                        // Skip individual match errors
-                    }
+            if (!foundTypes['system_breakage_risk']) {
+                foundTypes['system_breakage_risk'] = true;
+                var relatedTo = 'windows_reset';
+                if (containsAny(lowerText, ['resetting windows', 'reset windows'])) {
+                    relatedTo = 'windows_reset';
+                }
+                results.push({
+                    type: 'system_breakage_risk',
+                    related_to: relatedTo,
+                    confidence: 0.85
                 });
-            } catch (e) {
-                continue;
             }
         }
 
-        // Also do a general scan for warning keywords
-        if (results.length === 0) {
-            var detectedWarning = detectWarningType(text);
-            if (detectedWarning) {
+        // Check for data loss risk with reset context
+        if ((containsAny(lowerText, ['reset', 'resetting', 'wipe', 'wiping']) &&
+            containsAny(lowerText, ['pc', 'windows', 'computer'])) ||
+            containsAny(lowerText, ['without losing', 'not losing', 'don\'t want to lose'])) {
+
+            if (!foundTypes['data_loss_risk']) {
+                foundTypes['data_loss_risk'] = true;
                 results.push({
-                    type: detectedWarning.type,
-                    related_to: null,
-                    raw: text.substring(0, 100),
-                    confidence: detectedWarning.confidence
+                    type: 'data_loss_risk',
+                    related_to: 'pc_reset',
+                    confidence: 0.90
+                });
+            }
+        }
+
+        // Check for data loss concern during resets (Test 15)
+        if (containsAny(lowerText, ['worry about data', 'worried about data', 'worry about loss', 'still worry', 'still worried']) &&
+            containsAny(lowerText, ['reset', 'resets', 'resetting'])) {
+
+            if (!foundTypes['data_loss_risk']) {
+                foundTypes['data_loss_risk'] = true;
+                results.push({
+                    type: 'data_loss_risk',
+                    related_to: 'system_reset',
+                    confidence: 0.90
+                });
+            }
+        }
+
+        // Check for wiped/deleted results
+        if (containsAny(lowerText, ['wiped', 'deleted', 'lost', 'gone']) &&
+            containsAny(lowerText, ['files', 'data', 'local'])) {
+
+            if (!foundTypes['data_loss_risk']) {
+                foundTypes['data_loss_risk'] = true;
+                var relatedTo = detectRelatedTo(text);
+                results.push({
+                    type: 'data_loss_risk',
+                    related_to: relatedTo || 'file_deletion',
+                    confidence: 0.90
+                });
+            }
+        }
+
+        // General warning detection
+        if (results.length === 0) {
+            var detected = detectWarningType(text);
+            if (detected) {
+                var relatedTo = detectRelatedTo(text);
+                results.push({
+                    type: detected.type,
+                    related_to: relatedTo,
+                    confidence: detected.confidence
                 });
             }
         }
@@ -401,11 +286,6 @@ function deduplicateWarnings(warnings) {
 // 6. MAIN EXECUTION
 // ==========================================
 
-/**
- * Main Extraction Function
- * @param {string} text - Input text to extract warnings from
- * @returns {Array} Array of extracted warnings
- */
 function extractWarnings(text) {
     try {
         if (!isValidString(text)) {

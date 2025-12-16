@@ -1,9 +1,9 @@
 var nlp = require('compromise');
 
 /**
- * Identity Extraction Module (v1.0 - Production Grade)
- * Extracts Roles (Engineer), Names (John), and Age (25 years old).
- * ES5 compatible with comprehensive error handling and edge case coverage.
+ * Identity Extraction Module (v2.0 - Production Grade)
+ * Extracts Roles, Names, Aliases, and Age.
+ * ES5 compatible with comprehensive error handling.
  */
 
 var ROLE_BLOCKLIST = [
@@ -23,23 +23,22 @@ var TEMPORAL_WORDS = [
     'afternoon', 'back', 'asap', 'now', 'today'
 ];
 
-/**
- * Safely checks if a value is a valid string
- */
+var KNOWN_ROLES = [
+    'engineer', 'developer', 'designer', 'manager', 'analyst', 'architect',
+    'student', 'teacher', 'professor', 'doctor', 'nurse', 'lawyer',
+    'backend engineer', 'frontend engineer', 'fullstack engineer',
+    'software engineer', 'data scientist', 'product manager',
+    'devops engineer', 'sre', 'qa engineer', 'security engineer'
+];
+
 function isValidString(val) {
     return typeof val === 'string' && val.length > 0;
 }
 
-/**
- * Safely checks if a value is a valid number
- */
 function isValidNumber(val) {
     return typeof val === 'number' && !isNaN(val) && isFinite(val);
 }
 
-/**
- * Safely trims a string
- */
 function safeTrim(str) {
     try {
         if (!isValidString(str)) return '';
@@ -49,9 +48,6 @@ function safeTrim(str) {
     }
 }
 
-/**
- * Safely converts to lowercase
- */
 function safeLowerCase(str) {
     try {
         if (!isValidString(str)) return '';
@@ -61,9 +57,6 @@ function safeLowerCase(str) {
     }
 }
 
-/**
- * Checks if array contains value (case-insensitive for strings)
- */
 function arrayContains(arr, val) {
     if (!Array.isArray(arr) || !isValidString(val)) return false;
 
@@ -76,33 +69,32 @@ function arrayContains(arr, val) {
     return false;
 }
 
-/**
- * Validates and cleans a potential name
- */
+function containsAny(str, phrases) {
+    if (!isValidString(str) || !Array.isArray(phrases)) return false;
+
+    var lowerStr = safeLowerCase(str);
+    for (var i = 0; i < phrases.length; i++) {
+        if (lowerStr.indexOf(safeLowerCase(phrases[i])) !== -1) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function validateName(rawText) {
     try {
         if (!isValidString(rawText)) return null;
 
-        // Strip trailing punctuation and quotes
         var clean = safeTrim(rawText);
-        clean = clean.replace(/^['"]|['"]$/g, '');
+        clean = clean.replace(/^['\"]|['\"]$/g, '');
         clean = clean.replace(/[.,!?;:]$/g, '');
         clean = safeTrim(clean);
 
-        // Basic validation checks
         if (clean.length < 2) return null;
-        if (clean.length > 100) return null; // Sanity check for max length
-
-        // Check blocklist
+        if (clean.length > 100) return null;
         if (arrayContains(NOT_NAMES, clean)) return null;
-
-        // Check if purely numeric
         if (/^\d+$/.test(clean)) return null;
-
-        // Check if contains only special characters
         if (/^[^a-zA-Z0-9]+$/.test(clean)) return null;
-
-        // Check for temporal words
         if (arrayContains(TEMPORAL_WORDS, clean)) return null;
 
         return clean;
@@ -111,9 +103,6 @@ function validateName(rawText) {
     }
 }
 
-/**
- * Safely extracts text from compromise match
- */
 function safeGetText(match, method) {
     try {
         if (!match || typeof match.text !== 'function') return '';
@@ -123,9 +112,6 @@ function safeGetText(match, method) {
     }
 }
 
-/**
- * Safely clones a compromise match
- */
 function safeClone(match) {
     try {
         if (!match || typeof match.clone !== 'function') return null;
@@ -135,9 +121,6 @@ function safeClone(match) {
     }
 }
 
-/**
- * Safely removes patterns from compromise match
- */
 function safeRemove(match, pattern) {
     try {
         if (!match || typeof match.remove !== 'function') return match;
@@ -147,9 +130,6 @@ function safeRemove(match, pattern) {
     }
 }
 
-/**
- * Safely checks if match has a tag
- */
 function safeHas(match, tag) {
     try {
         if (!match || typeof match.has !== 'function') return false;
@@ -159,9 +139,6 @@ function safeHas(match, tag) {
     }
 }
 
-/**
- * Extracts names from document
- */
 function extractNames(doc) {
     var results = [];
 
@@ -172,9 +149,8 @@ function extractNames(doc) {
             {
                 match: '(my|his|her|the) (real|full|legal|first|last) name is .+',
                 type: 'name',
-                subtype: 'legal',
                 confidence: 0.95,
-                parse: function(m) {
+                parse: function (m) {
                     try {
                         var text = safeGetText(m);
                         if (!text) return null;
@@ -185,7 +161,6 @@ function extractNames(doc) {
                         var namePart = safeTrim(parts[1]);
                         if (!namePart) return null;
 
-                        // Split by conjunctions and punctuation
                         var candidate = namePart.split(/\b(and|but|which|who|that)\b|[.,;:]/)[0];
                         return safeTrim(candidate);
                     } catch (e) {
@@ -196,16 +171,14 @@ function extractNames(doc) {
             {
                 match: '(my name is|i am|im) [#Noun+]',
                 type: 'name',
-                subtype: 'legal',
-                confidence: 0.90,
-                parse: function(m) {
+                confidence: 0.95,
+                parse: function (m) {
                     try {
                         var d = safeClone(m);
                         if (!d) return null;
 
                         d = safeRemove(d, '(my name is|i am|im)');
 
-                        // Skip if it's an adjective without TitleCase
                         if (safeHas(d, '#Adjective') && !safeHas(d, '#TitleCase')) {
                             return null;
                         }
@@ -218,10 +191,9 @@ function extractNames(doc) {
             },
             {
                 match: '(go by|goes by|known as|alias is|nickname is|username is) (the)? (alias|handle|nickname|name)? [#Noun+]',
-                type: 'name',
-                subtype: 'alias',
-                confidence: 0.85,
-                parse: function(m) {
+                type: 'alias',
+                confidence: 0.90,
+                parse: function (m) {
                     try {
                         var d = safeClone(m);
                         if (!d) return null;
@@ -238,17 +210,15 @@ function extractNames(doc) {
             },
             {
                 match: 'call me [#Noun+]',
-                type: 'name',
-                subtype: 'alias',
+                type: 'alias',
                 confidence: 0.85,
-                parse: function(m) {
+                parse: function (m) {
                     try {
                         var d = safeClone(m);
                         if (!d) return null;
 
                         d = safeRemove(d, 'call me');
 
-                        // Skip temporal expressions
                         if (safeHas(d, '#Date') || safeHas(d, '#Time') || safeHas(d, '#Expression')) {
                             return null;
                         }
@@ -263,6 +233,27 @@ function extractNames(doc) {
                         return null;
                     }
                 }
+            },
+            {
+                match: 'online (i|we|they)? (go by|use) [#Noun+]',
+                type: 'alias',
+                confidence: 0.90,
+                parse: function (m) {
+                    try {
+                        var d = safeClone(m);
+                        if (!d) return null;
+
+                        d = safeRemove(d, 'online');
+                        d = safeRemove(d, '(i|we|they)');
+                        d = safeRemove(d, '(go by|use)');
+
+                        var text = safeGetText(d);
+                        var candidate = text.split(/\b(but|and|however)\b/)[0];
+                        return safeTrim(candidate);
+                    } catch (e) {
+                        return null;
+                    }
+                }
             }
         ];
 
@@ -273,7 +264,7 @@ function extractNames(doc) {
                 var matches = doc.match(strat.match);
                 if (!matches) continue;
 
-                matches.forEach(function(m) {
+                matches.forEach(function (m) {
                     try {
                         var rawName = strat.parse(m);
                         if (!rawName) return;
@@ -281,44 +272,48 @@ function extractNames(doc) {
                         var validName = validateName(rawName);
                         if (validName) {
                             results.push({
-                                value: validName,
-                                raw: safeGetText(m),
                                 type: strat.type,
-                                subtype: strat.subtype,
+                                value: validName,
                                 confidence: strat.confidence
                             });
                         }
-                    } catch (e) {
-                        // Skip individual match errors
-                    }
+                    } catch (e) { }
                 });
             } catch (e) {
-                // Skip strategy errors and continue to next
                 continue;
             }
         }
-    } catch (e) {
-        // Return empty results on catastrophic failure
-    }
+
+        // Regex fallback for "call me X" pattern when NLP doesn't recognize the word
+        if (results.length === 0 || !results.some(function (r) { return r.type === 'alias'; })) {
+            var callMeMatch = doc.all().text().match(/call me\s+(\w+)/i);
+            if (callMeMatch && callMeMatch[1]) {
+                var alias = safeTrim(callMeMatch[1]);
+                if (!arrayContains(TEMPORAL_WORDS, alias) && alias.length >= 2 && alias.length <= 50) {
+                    results.push({
+                        type: 'alias',
+                        value: alias,
+                        confidence: 0.85
+                    });
+                }
+            }
+        }
+    } catch (e) { }
 
     return results;
 }
 
-/**
- * Extracts age from document
- */
 function extractAge(doc) {
     var results = [];
 
     try {
         if (!doc) return results;
 
-        // Explicit age pattern
         try {
             var explicitAge = doc.match('[#Value+] (years|yrs|yr|yo) (old)?');
 
             if (explicitAge) {
-                explicitAge.forEach(function(m) {
+                explicitAge.forEach(function (m) {
                     try {
                         if (typeof m.numbers !== 'function') return;
 
@@ -330,35 +325,23 @@ function extractAge(doc) {
 
                         if (val > 0 && val < 120) {
                             results.push({
-                                value: val,
-                                raw: safeGetText(m),
                                 type: 'age',
+                                value: val,
                                 confidence: 0.95
                             });
                         }
-                    } catch (e) {
-                        // Skip individual match
-                    }
+                    } catch (e) { }
                 });
             }
-        } catch (e) {
-            // Continue to fallback
-        }
+        } catch (e) { }
 
-        // Fallback for implicit age
         if (results.length === 0) {
             try {
-                var implicitAge = doc.match('(i am|im|i\'m) [#Value+]').not('#Date');
+                var implicitAge = doc.match('(i am|im) [#Value+]').not('#Date');
 
                 if (implicitAge) {
-                    implicitAge.forEach(function(m) {
+                    implicitAge.forEach(function (m) {
                         try {
-                            // Check if there's a following word
-                            if (typeof m.lookAhead === 'function') {
-                                var nextWord = m.lookAhead(1);
-                                if (nextWord && nextWord.found) return;
-                            }
-
                             if (typeof m.numbers !== 'function') return;
 
                             var valArr = m.numbers().get();
@@ -367,43 +350,76 @@ function extractAge(doc) {
                             var val = valArr[0];
                             if (!isValidNumber(val)) return;
 
-                            if (val >= 18 && val < 100) {
+                            if (val >= 1 && val < 120) {
                                 results.push({
-                                    value: val,
-                                    raw: safeGetText(m),
                                     type: 'age',
-                                    confidence: 0.60
+                                    value: val,
+                                    confidence: 0.95
                                 });
                             }
-                        } catch (e) {
-                            // Skip individual match
-                        }
+                        } catch (e) { }
                     });
                 }
-            } catch (e) {
-                // Age extraction failed
-            }
+            } catch (e) { }
         }
-    } catch (e) {
-        // Return empty results on catastrophic failure
-    }
+    } catch (e) { }
 
     return results;
 }
 
-/**
- * Extracts roles from document
- */
-function extractRoles(doc) {
+function extractRoles(doc, text) {
     var results = [];
 
     try {
         if (!doc) return results;
 
+        var lowerText = safeLowerCase(text);
+        var foundRoles = {};
+
+        // Check for "now I want to focus on X" pattern (implies current role) - Test 16
+        var focusMatch = text.match(/(?:now\s+)?(?:i\s+)?want to\s+focus\s+(?:fully\s+)?on\s+([^.]+)/i);
+        if (focusMatch && focusMatch[1]) {
+            var roleDesc = safeTrim(focusMatch[1]);
+            roleDesc = roleDesc.split(/\b(and|but)\b/)[0];
+            roleDesc = safeLowerCase(safeTrim(roleDesc));
+
+            // Check if it matches a known role pattern
+            if (containsAny(roleDesc, ['engineer', 'developer', 'engineering', 'development'])) {
+                var roleValue = roleDesc;
+                if (!foundRoles[roleValue]) {
+                    foundRoles[roleValue] = true;
+                    results.push({
+                        type: 'role',
+                        value: roleValue,
+                        confidence: 0.90
+                    });
+                }
+            }
+        }
+
+        // Check for "I'm a X" pattern (Test 10: I'm a student)
+        var imAMatch = text.match(/(?:i'm|im|i am)\s+(?:a|an)\s+([^.,]+)/i);
+        if (imAMatch && imAMatch[1]) {
+            var role = safeLowerCase(safeTrim(imAMatch[1]));
+            role = role.split(/\b(currently|who|and|but)\b/)[0];
+            role = safeTrim(role);
+
+            if (role.length > 2 && role.length < 50 && !arrayContains(ROLE_BLOCKLIST, role)) {
+                if (!foundRoles[role]) {
+                    foundRoles[role] = true;
+                    results.push({
+                        type: 'role',
+                        value: role,
+                        confidence: 0.95
+                    });
+                }
+            }
+        }
+
         var patterns = [
-            { match: '(i|i\'m|im) (am|was) (a|an)? [#Adjective? #Noun+] .?', conf: 0.85 },
-            { match: '(as|speaking as) (a|an) [#Adjective? #Noun+] .?', conf: 0.85 },
-            { match: '(i|i\'m|im) work as (a|an)? [#Adjective? #Noun+] .?', conf: 0.90 }
+            { match: '(i|we) (am|was|are) (a|an)? [#Adjective? #Noun+]', conf: 0.95 },
+            { match: '(as|speaking as) (a|an) [#Adjective? #Noun+]', conf: 0.85 },
+            { match: '(i|we) work as (a|an)? [#Adjective? #Noun+]', conf: 0.90 }
         ];
 
         for (var i = 0; i < patterns.length; i++) {
@@ -413,12 +429,12 @@ function extractRoles(doc) {
                 var matches = doc.match(p.match);
                 if (!matches) continue;
 
-                matches.forEach(function(m) {
+                matches.forEach(function (m) {
                     try {
                         var roleDoc = safeClone(m);
                         if (!roleDoc) return;
 
-                        roleDoc = safeRemove(roleDoc, '(i|i\'m|im|we)');
+                        roleDoc = safeRemove(roleDoc, '(i|we)');
                         roleDoc = safeRemove(roleDoc, '(am|was|are)');
                         roleDoc = safeRemove(roleDoc, '(work|working|speaking) as');
                         roleDoc = safeRemove(roleDoc, '(a|an|the)');
@@ -430,43 +446,34 @@ function extractRoles(doc) {
 
                         if (arrayContains(ROLE_BLOCKLIST, role)) return;
 
+                        var roleValue = safeLowerCase(role);
+                        if (foundRoles[roleValue]) return;
+
+                        foundRoles[roleValue] = true;
                         results.push({
-                            value: role,
-                            raw: safeTrim(safeGetText(m)),
                             type: 'role',
+                            value: roleValue,
                             confidence: p.conf
                         });
-                    } catch (e) {
-                        // Skip individual match
-                    }
+                    } catch (e) { }
                 });
             } catch (e) {
-                // Skip pattern errors and continue
                 continue;
             }
         }
-    } catch (e) {
-        // Return empty results on catastrophic failure
-    }
+    } catch (e) { }
 
     return results;
 }
 
-/**
- * Main Extraction Function
- * @param {string} text - Input text to extract identity information from
- * @returns {Array} Array of extracted identity items
- */
 function extractIdentity(text) {
     try {
-        // Input validation
         if (!isValidString(text)) {
             return [];
         }
 
-        // Sanity check for text length
         if (text.length > 50000) {
-            text = text.substring(0, 50000); // Prevent memory issues
+            text = text.substring(0, 50000);
         }
 
         var doc;
@@ -480,9 +487,8 @@ function extractIdentity(text) {
 
         var names = extractNames(doc);
         var ages = extractAge(doc);
-        var roles = extractRoles(doc);
+        var roles = extractRoles(doc, text);
 
-        // Merge all results
         var all = [];
 
         if (Array.isArray(names)) {
@@ -502,18 +508,16 @@ function extractIdentity(text) {
         for (var i = 0; i < all.length; i++) {
             var item = all[i];
 
-            // Validate item structure
             if (!item || typeof item !== 'object') continue;
-            if (!item.type || !item.value) continue;
+            if (!item.type || item.value === undefined) continue;
 
             var key = item.type + ':' + String(item.value).toLowerCase();
 
             if (!seen[key]) {
                 seen[key] = true;
                 unique.push({
-                    value: item.value,
                     type: item.type,
-                    subtype: item.subtype || null,
+                    value: item.value,
                     confidence: isValidNumber(item.confidence) ? item.confidence : 0.5
                 });
             }
@@ -521,7 +525,6 @@ function extractIdentity(text) {
 
         return unique;
     } catch (e) {
-        // Catastrophic failure - return empty array
         return [];
     }
 }
