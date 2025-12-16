@@ -25,6 +25,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "compromise": "^14.14.5"
+    "compromise": "^14.14.5",
+    "spacy-nlp": "^1.0.11"
   }
 }

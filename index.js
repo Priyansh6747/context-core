@@ -2,7 +2,9 @@
 const identity = require("./modules/identity");
 const goals = require("./modules/goals");
 const tools = require("./modules/tools");
-let test = tools.extractTools("This project depends on cloud storage and passkeys for secure authentication.")
+const skills = require("./modules/skills");
+const jobs = require("./modules/jobs");
+let test = jobs.extractJobs("I’m working at a startup handling backend infrastructure and APIs.")
 console.log(test)
 
 function example() {
