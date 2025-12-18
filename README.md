@@ -101,7 +101,7 @@ npm install context-core
 const { extractContext } = require("context-core");
 
 const result = extractContext(
-  "I want to reset my PC without losing my Chrome data."
+  "I want to reset my PC, but I'm worried about losing my data. I've done this before on Windows."
 );
 
 console.log(result);
@@ -113,23 +113,36 @@ console.log(result);
 {
   "goals": [
     {
-      "description": "reset pc without losing chrome data",
+      "description": "reset pc",
       "horizon": "short",
       "status": "active",
-      "confidence": 0.85
+      "confidence": 0.9
+    }
+  ],
+  "warnings": [
+    {
+      "type": "data_loss",
+      "confidence": 0.9
+    }
+  ],
+  "experiences": [
+    {
+      "description": "done this before",
+      "confidence": 0.8
     }
   ],
   "tools": [
     {
-      "type": "software",
-      "name": "google_chrome",
+      "type": "os",
+      "name": "windows",
       "confidence": 0.9
     }
   ],
   "events": [],
   "identity": [],
   "meta": {
-    "source": "text"
+    "source": "text",
+    "parser_version": "0.1.0"
   }
 }
 ```
